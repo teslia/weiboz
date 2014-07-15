@@ -7,43 +7,130 @@
 //
 
 #import "AppDelegate.h"
+#import "MainViewController.h"
+#import "DDMenuController.h"
+#import "LeftViewController.h"
+#import "RightViewController.h"
+#import "LoginViewController.h"
+#import "ProgressHUD.h"
+#import "WebViewController.h"
 
 @implementation AppDelegate
 
+
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleLightContent];
+    //[WeiboSDK enableDebugMode:YES];
+    [WeiboSDK registerApp:kAppKey];
+    
+    //从UserDefault读取是否登录过
+    NSDictionary *sinaWeiboInfo = [[NSUserDefaults standardUserDefaults] objectForKey:@"SinaWeiboAuthData"];
+    if([sinaWeiboInfo objectForKey:@"AccessTokenKey"] && [sinaWeiboInfo objectForKey:@"ExpirationDateKey"] && [sinaWeiboInfo objectForKey:@"UserIDKey"]){
+        self.wb_token =[sinaWeiboInfo objectForKey:@"AccessTokenKey"];
+        self.wb_exp = [sinaWeiboInfo objectForKey:@"ExpirationDateKey"];
+        self.wb_uid = [sinaWeiboInfo objectForKey:@"UserIDKey"];
+        self.isLogin = YES;
+    }
+
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-    // Override point for customization after application launch.
     self.window.backgroundColor = [UIColor whiteColor];
+    
+    if(!self.isLogin){
+    LoginViewController *login = [[LoginViewController alloc]init];
+        [self.window addSubview:login.view];
+        self.window.rootViewController = login;
+    }else{
+        self.mvc = [[MainViewController alloc]init];
+        _menu = [[DDMenuController alloc]initWithRootViewController:self.mvc];
+       
+        self.window.rootViewController = _menu;
+    
+        LeftViewController *lvc = [[LeftViewController alloc]init];
+        RightViewController *rvc = [[RightViewController alloc]init];
+    
+        _menu.leftViewController = lvc;
+        _menu.rightViewController = rvc;
+    }
     [self.window makeKeyAndVisible];
     return YES;
 }
 
-- (void)applicationWillResignActive:(UIApplication *)application
-{
-    // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-    // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
+-(void)loginOK{
+    self.window.rootViewController = nil;
+    self.mvc = [[MainViewController alloc]init];
+    _menu = [[DDMenuController alloc]initWithRootViewController:self.mvc];
+    
+    self.window.rootViewController = _menu;
+    
+    LeftViewController *lvc = [[LeftViewController alloc]init];
+    RightViewController *rvc = [[RightViewController alloc]init];
+    
+    _menu.leftViewController = lvc;
+    _menu.rightViewController = rvc;
+    [self performSelector:@selector(loginOKTips) withObject:nil afterDelay:0.5];
+}
+-(void)loginOKTips{
+    [ProgressHUD showSuccess:@"登录成功"];
+}
+-(void)loginOut{
+    self.window.rootViewController = nil;
+    self.mvc = nil;
+    
+    LoginViewController *login = [[LoginViewController alloc]init];
+    [self.window addSubview:login.view];
+    self.window.rootViewController = login;
+    [[NSUserDefaults standardUserDefaults]removeObjectForKey:@"SinaWeiboAuthData"];
 }
 
-- (void)applicationDidEnterBackground:(UIApplication *)application
+- (void)didReceiveWeiboResponse:(WBBaseResponse *)response
 {
-    // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later. 
-    // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
+    if ([response isKindOfClass:WBSendMessageToWeiboResponse.class])
+    {
+      /**  NSString *title = @"发送结果";
+        NSString *message = [NSString stringWithFormat:@"响应状态: %d\n响应UserInfo数据: %@\n原请求UserInfo数据: %@",(int)response.statusCode, response.userInfo, response.requestUserInfo];
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:title
+                                                        message:message
+                                                       delegate:nil
+                                              cancelButtonTitle:@"确定"
+                                              otherButtonTitles:nil];
+        [alert show];
+       **/
+    }
+    else if ([response isKindOfClass:WBAuthorizeResponse.class])
+    {
+        self.wb_token = [(WBAuthorizeResponse *)response accessToken];
+        self.wb_exp = [(WBAuthorizeResponse *)response expirationDate];
+        self.wb_uid = [(WBAuthorizeResponse *)response userID];
+        if(self.wb_token != nil){
+            //将Token信息保存成字典写入UserDefault
+            NSDictionary *SinaWeiboAuthData = @{@"AccessTokenKey":self.wb_token,@"ExpirationDateKey":self.wb_exp,@"UserIDKey":self.wb_uid};
+            [[NSUserDefaults standardUserDefaults] setObject:SinaWeiboAuthData forKey:@"SinaWeiboAuthData"];
+            self.isLogin = YES;
+            [self loginOK];
+        }else{
+            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"提示" message:@"获取授权失败" delegate:nil cancelButtonTitle:@"知道了" otherButtonTitles:nil];
+            [alert show];
+        }
+    }
 }
 
-- (void)applicationWillEnterForeground:(UIApplication *)application
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
 {
-    // Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
+    return [WeiboSDK handleOpenURL:url delegate:self];
 }
 
-- (void)applicationDidBecomeActive:(UIApplication *)application
+- (void)didReceiveWeiboRequest:(WBBaseRequest *)request
 {
-    // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+    if ([request isKindOfClass:WBProvideMessageForWeiboRequest.class])
+    {
+
+    }
 }
 
-- (void)applicationWillTerminate:(UIApplication *)application
-{
-    // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+-(void)openWeb:(NSString *)url{
+     WebViewController *web = [[WebViewController alloc]initWithURL:url];
+    [self.mvc presentViewController:web animated:YES completion:nil];
 }
 
 @end

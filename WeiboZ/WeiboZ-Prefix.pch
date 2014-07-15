@@ -14,3 +14,27 @@
     #import <UIKit/UIKit.h>
     #import <Foundation/Foundation.h>
 #endif
+
+#import "WeiboSDK.h"
+#import "WXHLGlobalUICommon.h"
+#import "UIViewExt.h"
+#import "UIView+Additions.h"
+
+//获取设备的物理高度
+#define ScreenHeight [UIScreen mainScreen].bounds.size.height
+
+//获取设备的物理宽度
+#define ScreenWidth [UIScreen mainScreen].bounds.size.width
+
+//Weibo OAuth2.0
+#define kAppKey         @"3276826840"
+#define kRedirectURI    @"https://api.weibo.com/oauth2/default.html"
+//微博缓存文件名
+#define kWeiboLocalCacheFileName  [UIUtils getDocumentsPath:@"WeiboArchData.loa"]
+
+#define kThemeListLabel @"kThemeListLabel"
+#define kNavigationBarTitleLabel @"kNavigationBarTitleLabel"
+#define kBrowMode @"kBrowMode"
+
+//通知
+#define kReloadWeiboTableNotification @"kReloadWeiboTableNotification"
